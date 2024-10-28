@@ -6,14 +6,31 @@
     <title>AR com Ícone de Pessoa</title>  
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>  
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>  
+    <script>  
+        // Função para ajustar o objeto na superfície detectada  
+        function adjustModelOnSurface() {  
+            const model = document.getElementById("icone");  
+            const scene = document.querySelector("a-scene");  
+
+            // Escuta o evento de 'arjs-anchor-added' para ajustar a posição do modelo  
+            scene.addEventListener("arjs-anchor-added", function(event) {  
+                const anchor = event.detail.anchor;  
+                if (anchor) {  
+                    // Posição onde o objeto será colocado de acordo com a âncora detectada  
+                    model.object3D.position.copy(anchor.position);  
+                    model.object3D.rotation.set(0, 0, 0); // Rotação inicial do modelo  
+                }  
+            });  
+        }  
+    </script>  
 </head>  
-<body style="margin: 0; overflow: hidden;">  
+<body style="margin: 0; overflow: hidden;" onload="adjustModelOnSurface();">  
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">  
         <a-entity  
             id="icone"  
             gltf-model="https://modelviewer.dev/shared-assets/models/Astronaut.glb"  
-            scale="1 1 1"    
-            position="-0 -1.15 -8" 
+            scale="0.85 0.85 0.85"    
+            position="0 -1.15 -8"   
             rotation="0 0 0"  
             animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"  
         ></a-entity>  
