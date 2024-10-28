@@ -1,41 +1,112 @@
-<!DOCTYPE html>  
-<html>  
-<head>  
-    <meta charset="utf-8">  
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
-    <title>AR com Ícone de Pessoa</title>  
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>  
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>  
-    <script>  
-        // Função para ajustar o objeto na superfície detectada  
-        function adjustModelOnSurface() {  
-            const model = document.getElementById("icone");  
-            const scene = document.querySelector("a-scene");  
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR com Detecção de Superfície</title>
+    <!-- Usamos o Mozilla WebXR Viewer polyfill para suporte mais amplo -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/DRACOLoader.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <canvas id="canvas"></canvas>
+    <div id="overlay" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-family: Arial; text-align: center;">
+        Procurando superfícies planas...
+    </div>
 
-            // Escuta o evento de 'arjs-anchor-added' para ajustar a posição do modelo  
-            scene.addEventListener("arjs-anchor-added", function(event) {  
-                const anchor = event.detail.anchor;  
-                if (anchor) {  
-                    // Posição onde o objeto será colocado de acordo com a âncora detectada  
-                    model.object3D.position.copy(anchor.position);  
-                    model.object3D.rotation.set(0, 0, 0); // Rotação inicial do modelo  
-                }  
-            });  
-        }  
-    </script>  
-</head>  
-<body style="margin: 0; overflow: hidden;" onload="adjustModelOnSurface();">  
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">  
-        <a-entity  
-            id="icone"  
-            gltf-model="https://modelviewer.dev/shared-assets/models/Astronaut.glb"  
-            scale="0.85 0.85 0.85"    
-            position="0 -1.15 -8"   
-            rotation="0 0 0"  
-            animation="property: rotation; to: 0 360 0; loop: true; dur: 10000; easing: linear"  
-        ></a-entity>  
-        
-        <a-entity camera></a-entity>  
-    </a-scene>  
-</body>  
+    <script>
+        let scene, camera, renderer, model;
+        const loader = new THREE.GLTFLoader();
+
+        async function initialize() {
+            // Verifica suporte a WebXR
+            if (!navigator.xr) {
+                alert("WebXR não suportado neste navegador");
+                return;
+            }
+
+            // Configuração básica da cena
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({
+                canvas: document.querySelector("#canvas"),
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+
+            // Adiciona luz
+            const light = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(light);
+
+            // Carrega o modelo 3D
+            try {
+                loader.load('https://modelviewer.dev/shared-assets/models/Astronaut.glb', (gltf) => {
+                    model = gltf.scene;
+                    model.scale.set(0.5, 0.5, 0.5);
+                    model.visible = false; // Inicialmente invisível
+                    scene.add(model);
+                });
+            } catch (error) {
+                console.error("Erro ao carregar modelo:", error);
+            }
+
+            // Configura a sessão AR
+            const session = await navigator.xr.requestSession("immersive-ar", {
+                requiredFeatures: ["hit-test", "local-floor"]
+            });
+
+            renderer.xr.setSession(session);
+            session.addEventListener("select", onSelect);
+
+            // Configuração do hit testing
+            const hitTestSource = await session.requestHitTestSource({
+                space: await session.requestReferenceSpace("viewer")
+            });
+
+            // Loop de renderização
+            renderer.setAnimationLoop((timestamp, frame) => {
+                if (!frame) return;
+
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+                
+                if (hitTestResults.length > 0) {
+                    document.getElementById("overlay").textContent = "Toque na tela para colocar o objeto";
+                    const hit = hitTestResults[0];
+                    const pose = hit.getPose(renderer.xr.getReferenceSpace());
+
+                    if (model && !model.visible) {
+                        model.visible = true;
+                        model.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+                    }
+                }
+
+                // Rotação contínua do modelo
+                if (model) {
+                    model.rotation.y += 0.01;
+                }
+
+                renderer.render(scene, camera);
+            });
+        }
+
+        function onSelect(event) {
+            if (model && model.visible) {
+                document.getElementById("overlay").style.display = "none";
+            }
+        }
+
+        // Inicia a aplicação
+        initialize().catch(console.error);
+
+        // Ajusta o tamanho quando a janela é redimensionada
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
 </html>
